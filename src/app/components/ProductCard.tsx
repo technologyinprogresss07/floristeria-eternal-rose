@@ -3,12 +3,12 @@ import { ImageWithFallback } from './figma/ImageWithFallback';
 import { useState } from 'react';
 
 interface ProductCardProps {
-  id: number;
+  id: string;
   name: string;
   price: string;
   image: string;
   description: string;
-  onAddToCart: (product: { id: number; name: string; price: string; image: string }) => void;
+  onAddToCart: (product: { id: string; name: string; price: string; image: string }) => void;
 }
 
 export function ProductCard({ id, name, price, image, description, onAddToCart }: ProductCardProps) {

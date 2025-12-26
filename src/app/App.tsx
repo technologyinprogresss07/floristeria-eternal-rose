@@ -8,6 +8,7 @@ import { WhatsAppButton } from './components/WhatsAppButton';
 import { CartModal } from './components/CartModal';
 import { OrderModal } from './components/OrderModal';
 import { useState } from 'react';
+import { AdminPage } from "./pages/AdminPage";
 
 interface CartItem {
   id: number;
