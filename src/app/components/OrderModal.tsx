@@ -7,6 +7,7 @@ interface OrderModalProps {
 }
 
 export function OrderModal({ isOpen, onClose }: OrderModalProps) {
+  const WHATSAPP_OWNER = "18299105423"; // sin +, sin espacios. Ej: 18091234567
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -18,14 +19,30 @@ export function OrderModal({ isOpen, onClose }: OrderModalProps) {
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      setFormData({ name: '', email: '', phone: '', details: '' });
-      onClose();
-    }, 2000);
-  };
+  e.preventDefault();
+
+  const msg =
+`Cliente:
+Nombre: ${formData.name}
+Teléfono: ${formData.phone}
+Email: ${formData.email}
+
+Quiere realizar un pedido personalizado.
+
+Detalles:
+${formData.details}`;
+
+  const url = `https://wa.me/${WHATSAPP_OWNER}?text=${encodeURIComponent(msg)}`;
+  window.location.href = url;
+
+  // opcional: mostrar confirmación y cerrar modal
+  setSubmitted(true);
+  setTimeout(() => {
+    setSubmitted(false);
+    setFormData({ name: '', email: '', phone: '', details: '' });
+    onClose();
+  }, 1200);
+};
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({
@@ -115,6 +132,7 @@ export function OrderModal({ isOpen, onClose }: OrderModalProps) {
 
               <button 
                 type="submit"
+                onClick={(e) => e.stopPropagation()}
                 className="w-full bg-primary text-primary-foreground px-8 py-3 rounded-full hover:opacity-90 transition-opacity"
               >
                 Enviar Encargo
