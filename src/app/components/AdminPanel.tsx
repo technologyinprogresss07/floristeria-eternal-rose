@@ -18,42 +18,70 @@ interface AdminPanelProps {
   onUpdateProducts: (products: Product[]) => void;
 }
 
+type Order = {
+  id: string;
+  created_at: string;
+  customer_name: string | null;
+  customer_phone: string | null;
+  total: number;
+};
+
+type OrderItem = {
+  id: string;
+  order_id: string;
+  product_name: string;
+  price: number;
+  quantity: number;
+  image_url: string | null;
+};
+
 export function AdminPanel({ isOpen, onClose, products, onUpdateProducts }: AdminPanelProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [activeTab, setActiveTab] = useState<"products" | "orders">("products");
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
 
   // Login Supabase
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
-  const run = async () => {
-    // ✅ fuerza login siempre al entrar a /admin
+  if (!isOpen) return;
+
+  let unsubscribe: null | (() => void) = null;
+
+  (async () => {
+    // ✅ fuerza login siempre al ABRIR el panel
     await supabase.auth.signOut();
     setIsAuthenticated(false);
 
-    const result = await supabase.auth.getSession();
-    setIsAuthenticated(!!result.data.session);
+    const { data } = await supabase.auth.getSession();
+    setIsAuthenticated(!!data.session);
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAuthenticated(!!session);
     });
 
-    return () => {
-      sub.subscription.unsubscribe();
-    };
-  };
-
-  // ejecuta y guarda cleanup correctamente
-  let cleanup: undefined | (() => void);
-  run().then((c) => {
-    cleanup = c;
-  });
+    unsubscribe = () => sub.subscription.unsubscribe();
+  })();
 
   return () => {
-    if (cleanup) cleanup();
+    if (unsubscribe) unsubscribe();
   };
-}, []);
+}, [isOpen]);
+
+useEffect(() => {
+  if (isOpen) return;
+
+  // cuando se cierra el panel
+  setActiveTab("products");
+  setSelectedOrder(null);
+  setOrderItems([]);
+  setOrders([]);
+}, [isOpen]);
 
   // CRUD
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -225,6 +253,38 @@ export function AdminPanel({ isOpen, onClose, products, onUpdateProducts }: Admi
   onUpdateProducts((data ?? []) as any);
 };
 
+const loadOrders = async () => {
+  const { data, error } = await supabase
+    .from("orders")
+    .select("id, created_at, customer_name, customer_phone, total")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error(error);
+    alert("No se pudieron cargar los pedidos.");
+    return;
+  }
+
+  setOrders((data ?? []) as any);
+};
+
+const openOrder = async (order: Order) => {
+  setSelectedOrder(order);
+
+  const { data, error } = await supabase
+    .from("order_items")
+    .select("id, order_id, product_name, price, quantity, image_url")
+    .eq("order_id", order.id);
+
+  if (error) {
+    console.error(error);
+    alert("No se pudieron cargar los productos del pedido.");
+    return;
+  }
+
+  setOrderItems((data ?? []) as any);
+};
+
   const handleChange = (
   e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
 ) => {
@@ -243,6 +303,54 @@ export function AdminPanel({ isOpen, onClose, products, onUpdateProducts }: Admi
     ...prev,
     [name]: value
   }));
+};
+
+  const handleUploadImage = async (file: File) => {
+  // ✅ VALIDACIONES ANTES
+  if (!file.type.startsWith("image/")) {
+    alert("Solo se permiten imágenes.");
+    return;
+  }
+
+  const maxMB = 5;
+  if (file.size > maxMB * 1024 * 1024) {
+    alert(`La imagen no puede pasar de ${maxMB}MB.`);
+    return;
+  }
+
+  try {
+    setUploading(true);
+
+    const ext = file.name.split(".").pop() || "jpg";
+    const safeUUID =
+      (crypto as any).randomUUID?.() ??
+      `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+    const fileName = `${safeUUID}.${ext}`;
+    const filePath = `products/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("products")
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: true,
+        contentType: file.type,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage.from("products").getPublicUrl(filePath);
+
+    setFormData((prev) => ({
+      ...prev,
+      image_url: data.publicUrl,
+    }));
+  } catch (err) {
+    console.error(err);
+    alert("No se pudo subir la imagen.");
+  } finally {
+    setUploading(false);
+  }
 };
 
   return (
@@ -313,7 +421,7 @@ export function AdminPanel({ isOpen, onClose, products, onUpdateProducts }: Admi
                 </button>
               </form>
             </div>
-          ) : editingProduct ? (
+                    ) : editingProduct ? (
             <div>
               <h3 className="text-xl mb-6">{editingProduct.name ? 'Editar' : 'Agregar'} Producto</h3>
               <form onSubmit={handleSaveProduct} className="space-y-4 max-w-2xl">
@@ -347,19 +455,47 @@ export function AdminPanel({ isOpen, onClose, products, onUpdateProducts }: Admi
                 </div>
 
                 <div>
-                  <label htmlFor="product-image" className="block mb-2">URL de la Imagen</label>
+                  <label htmlFor="product-image" className="block mb-2">
+                    Imagen del producto
+                  </label>
+
                   <input
                     type="url"
                     id="product-image"
                     name="image_url"
                     value={formData.image_url}
                     onChange={handleChange}
-                    required
                     className="w-full px-4 py-3 rounded-lg bg-input-background border border-border focus:outline-none focus:ring-2 focus:ring-ring"
                     placeholder="https://ejemplo.com/imagen.jpg"
                   />
+
+                  <div className="mt-3">
+                    <label className="block mb-2 text-sm text-muted-foreground">
+                      O sube una imagen desde tu PC
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*,.jpg,.jpeg,.png,.webp"
+                      disabled={uploading}
+                      className="w-full text-sm file:mr-4 file:py-2 file:px-4
+                                file:rounded-lg file:border-0
+                                file:bg-secondary file:text-secondary-foreground
+                                hover:file:opacity-90
+                                disabled:opacity-50 disabled:cursor-not-allowed"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleUploadImage(file);
+                        e.currentTarget.value = "";
+                      }}
+                    />
+                  </div>
+
                   {formData.image_url && (
-                    <img src={formData.image_url} alt="Preview" className="mt-2 w-32 h-32 object-cover rounded-lg" />
+                    <img
+                      src={formData.image_url}
+                      alt="Preview"
+                      className="mt-2 w-32 h-32 object-cover rounded-lg"
+                    />
                   )}
                 </div>
 
@@ -378,11 +514,12 @@ export function AdminPanel({ isOpen, onClose, products, onUpdateProducts }: Admi
                 </div>
 
                 <div className="flex gap-4">
-                  <button 
+                  <button
                     type="submit"
-                    className="flex-1 bg-primary text-primary-foreground px-8 py-3 rounded-full hover:opacity-90 transition-opacity"
+                    disabled={uploading}
+                    className="flex-1 bg-primary text-primary-foreground px-8 py-3 rounded-full hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Guardar Producto
+                    {uploading ? "Subiendo imagen..." : "Guardar Producto"}
                   </button>
                   <button 
                     type="button"
@@ -396,55 +533,183 @@ export function AdminPanel({ isOpen, onClose, products, onUpdateProducts }: Admi
             </div>
           ) : (
             <div>
+              {/* Header + Tabs */}
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl">Productos ({products.length})</h3>
-                <button
-                  onClick={handleAddProduct}
-                  className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-2 rounded-full hover:opacity-90 transition-opacity"
-                >
-                  <Plus className="w-5 h-5" />
-                  Agregar Producto
-                </button>
+                <h3 className="text-xl">
+                  {activeTab === "products"
+                    ? `Productos (${products.length})`
+                    : `Pedidos (${orders.length})`}
+                </h3>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab("products");
+                      setSelectedOrder(null);
+                    }}
+                    className={`px-6 py-2 rounded-full hover:opacity-90 transition-opacity ${
+                      activeTab === "products"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-secondary-foreground"
+                    }`}
+                  >
+                    Productos
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setActiveTab("orders");
+                      setSelectedOrder(null);
+                      await loadOrders();
+                    }}
+                    className={`px-6 py-2 rounded-full hover:opacity-90 transition-opacity ${
+                      activeTab === "orders"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-secondary-foreground"
+                    }`}
+                  >
+                    Pedidos
+                  </button>
+                </div>
               </div>
 
-              <div className="space-y-4">
-                {products.map(product => (
-                  <div key={product.id} className="flex gap-4 bg-background rounded-lg p-4">
-                    <img src={product.image_url} alt={product.name} className="w-20 h-20 object-cover rounded-lg" />
-                    <div className="flex-1">
-                      <h4 className="mb-1">{product.name}</h4>
-                      <p className="text-primary mb-1">RD${product.price.toLocaleString()}</p>
-                      <p className="text-sm text-muted-foreground">{product.description}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleEditProduct(product)}
-                        className="h-10 px-4 rounded-lg bg-secondary hover:bg-primary hover:text-primary-foreground transition-colors flex items-center gap-2"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => product.id && handleDeleteProduct(product.id)}
-                        className="h-10 px-4 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors flex items-center gap-2"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Eliminar
-                      </button>
-                    </div>
+              {activeTab === "products" ? (
+                <>
+                  {/* TU LISTA ORIGINAL DE PRODUCTOS */}
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl">Productos ({products.length})</h3>
+                    <button
+                      onClick={handleAddProduct}
+                      className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-2 rounded-full hover:opacity-90 transition-opacity"
+                    >
+                      <Plus className="w-5 h-5" />
+                      Agregar Producto
+                    </button>
                   </div>
-                ))}
 
-                {products.length === 0 && (
-                  <div className="text-center py-12 text-muted-foreground">
-                    No hay productos. Haz clic en "Agregar Producto" para comenzar.
+                  <div className="space-y-4">
+                    {products.map(product => (
+                      <div key={product.id} className="flex gap-4 bg-background rounded-lg p-4">
+                        <img src={product.image_url} alt={product.name} className="w-20 h-20 object-cover rounded-lg" />
+                        <div className="flex-1">
+                          <h4 className="mb-1">{product.name}</h4>
+                          <p className="text-primary mb-1">RD${product.price.toLocaleString()}</p>
+                          <p className="text-sm text-muted-foreground">{product.description}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEditProduct(product)}
+                            className="h-10 px-4 rounded-lg bg-secondary hover:bg-primary hover:text-primary-foreground transition-colors flex items-center gap-2"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => product.id && handleDeleteProduct(product.id)}
+                            className="h-10 px-4 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors flex items-center gap-2"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {products.length === 0 && (
+                      <div className="text-center py-12 text-muted-foreground">
+                        No hay productos. Haz clic en "Agregar Producto" para comenzar.
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </>
+              ) : (
+                <>
+                  {/* PEDIDOS */}
+                  <div className="space-y-4">
+                    {orders.map((o) => (
+                      <button
+                        key={o.id}
+                        type="button"
+                        onClick={() => openOrder(o)}
+                        className="w-full text-left flex items-center justify-between gap-4 bg-background rounded-lg p-4 hover:opacity-90 transition-opacity"
+                      >
+                        <div>
+                          <h4 className="mb-1">Pedido #{o.id.slice(0, 8).toUpperCase()}</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(o.created_at).toLocaleString()}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Cliente: {o.customer_name ?? "Sin nombre"}
+                          </p>
+                        </div>
+
+                        <div className="text-right">
+                          <p className="text-primary font-semibold">RD${o.total.toFixed(2)}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {o.customer_phone ?? "Sin teléfono"}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+
+                    {orders.length === 0 && (
+                      <div className="text-center py-12 text-muted-foreground">
+                        No hay pedidos todavía.
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedOrder && (
+                    <div className="mt-6 bg-background rounded-lg p-4 border border-border">
+                      <h4 className="mb-2">
+                        Detalle Pedido #{selectedOrder.id.slice(0, 8).toUpperCase()}
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Fecha: {new Date(selectedOrder.created_at).toLocaleString()}
+                      </p>
+
+                      <div className="space-y-3">
+                        {orderItems.map((it) => (
+                          <div key={it.id} className="flex gap-4 bg-background rounded-lg p-4 border border-border">
+                            {it.image_url ? (
+                              <img src={it.image_url} alt={it.product_name} className="w-16 h-16 object-cover rounded-lg" />
+                            ) : (
+                              <div className="w-16 h-16 rounded-lg bg-secondary" />
+                            )}
+
+                            <div className="flex-1">
+                              <h4 className="mb-1">{it.product_name}</h4>
+                              <p className="text-sm text-muted-foreground">
+                                RD${it.price.toLocaleString()} x {it.quantity}
+                              </p>
+                            </div>
+
+                            <div className="font-semibold">
+                              RD${(it.price * it.quantity).toLocaleString()}
+                            </div>
+                          </div>
+                        ))}
+
+                        {orderItems.length === 0 && (
+                          <div className="text-center py-6 text-muted-foreground">
+                            Este pedido no tiene productos.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
-          )}
+                    )}
         </div>
       </div>
     </div>
   );
 }
+
+
+
+

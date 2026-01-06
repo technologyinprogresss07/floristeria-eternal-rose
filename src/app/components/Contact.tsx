@@ -9,14 +9,30 @@ export function Contact() {
   });
   const [submitted, setSubmitted] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      setFormData({ name: '', email: '', message: '' });
-    }, 3000);
-  };
+const OWNER_WHATSAPP = "18299105423";
+
+const handleSubmit = (e: React.FormEvent) => {
+  e.preventDefault();
+
+  const name = formData.name.trim();
+  const email = formData.email.trim();
+  const message = formData.message.trim();
+
+  const text =
+    `📩 Nuevo mensaje desde la web:%0A%0A` +
+    `👤 Nombre: ${encodeURIComponent(name)}%0A` +
+    `✉️ Email: ${encodeURIComponent(email)}%0A%0A` +
+    `📝 Mensaje:%0A${encodeURIComponent(message)}`;
+
+  const url = `https://wa.me/${OWNER_WHATSAPP}?text=${text}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+
+  setSubmitted(true);
+  setTimeout(() => {
+    setSubmitted(false);
+    setFormData({ name: "", email: "", message: "" });
+  }, 3000);
+};
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({
@@ -110,7 +126,7 @@ export function Contact() {
                 </div>
                 <div>
                   <h4 className="mb-1">Email</h4>
-                  <p className="text-muted-foreground">info@eternalrose.com</p>
+                  <p className="text-muted-foreground">ysabelkarla64@gmail.com</p>
                 </div>
               </a>
 
@@ -123,7 +139,7 @@ export function Contact() {
                 </div>
                 <div>
                   <h4 className="mb-1">Teléfono</h4>
-                  <p className="text-muted-foreground">+34 123 456 789</p>
+                  <p className="text-muted-foreground">+1 (829) 910-5423</p>
                 </div>
               </a>
 
@@ -133,7 +149,7 @@ export function Contact() {
                 </div>
                 <div>
                   <h4 className="mb-1">Dirección</h4>
-                  <p className="text-muted-foreground">Calle de las Flores 123<br />28001 Madrid, España</p>
+                  <p className="text-muted-foreground">Tienda Virtual</p>
                 </div>
               </div>
 
@@ -141,22 +157,13 @@ export function Contact() {
                 <h4 className="mb-4">Síguenos en redes</h4>
                 <div className="flex gap-4">
                   <a 
-                    href="https://instagram.com" 
+                    href="https://www.instagram.com/by.eternal_rose?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="w-12 h-12 rounded-full bg-primary/10 hover:bg-primary hover:text-primary-foreground transition-colors flex items-center justify-center"
                     aria-label="Instagram"
                   >
                     <Instagram className="w-6 h-6" />
-                  </a>
-                  <a 
-                    href="https://facebook.com" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="w-12 h-12 rounded-full bg-primary/10 hover:bg-primary hover:text-primary-foreground transition-colors flex items-center justify-center"
-                    aria-label="Facebook"
-                  >
-                    <Facebook className="w-6 h-6" />
                   </a>
                 </div>
               </div>

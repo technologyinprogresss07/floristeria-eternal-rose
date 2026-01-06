@@ -1,7 +1,7 @@
 import { MessageCircle } from 'lucide-react';
 
 export function WhatsAppButton() {
-  const phoneNumber = '34123456789'; // Número sin espacios ni símbolos
+  const phoneNumber = '+18299105423'; // Número sin espacios ni símbolos
   const message = '¡Hola! Me gustaría información sobre las flores eternas.';
   const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
 

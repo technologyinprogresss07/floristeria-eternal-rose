@@ -17,15 +17,30 @@ export function OrderModal({ isOpen, onClose }: OrderModalProps) {
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      setFormData({ name: '', email: '', phone: '', details: '' });
-      onClose();
-    }, 2000);
-  };
+const OWNER_WHATSAPP = "+18299105423"; // Número de WhatsApp del propietario
+
+const handleSubmit = (e: React.FormEvent) => {
+  e.preventDefault();
+
+  const msg =
+    `🌹 *Nuevo Encargo Personalizado*%0A%0A` +
+    `👤 *Nombre:* ${encodeURIComponent(formData.name)}%0A` +
+    `📧 *Email:* ${encodeURIComponent(formData.email)}%0A` +
+    `📱 *Teléfono:* ${encodeURIComponent(formData.phone)}%0A%0A` +
+    `📝 *Detalles:*%0A${encodeURIComponent(formData.details)}`;
+
+  const waUrl = `https://wa.me/${OWNER_WHATSAPP}?text=${msg}`;
+
+  // Abre WhatsApp (web o app)
+  window.open(waUrl, "_blank", "noopener,noreferrer");
+
+  setSubmitted(true);
+  setTimeout(() => {
+    setSubmitted(false);
+    setFormData({ name: "", email: "", phone: "", details: "" });
+    onClose();
+  }, 2000);
+};
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({

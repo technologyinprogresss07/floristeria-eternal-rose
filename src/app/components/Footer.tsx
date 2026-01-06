@@ -4,19 +4,36 @@ import { useState } from 'react';
 interface FooterProps {
   onOpenAdmin?: () => void;
 }
-
 export function Footer({ onOpenAdmin }: FooterProps) {
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
 
-  const handleSubscribe = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubscribed(true);
-    setTimeout(() => {
-      setSubscribed(false);
-      setEmail('');
-    }, 3000);
-  };
+const OWNER_WHATSAPP = "18299105423"; 
+
+const handleSubscribe = (e: React.FormEvent) => {
+  e.preventDefault();
+
+  const emailTrim = email.trim();
+  if (!emailTrim) return;
+
+  const msg =
+    `Hola 👋\n` +
+    `Quiero suscribirme para recibir notificaciones de ofertas especiales.\n\n` +
+    `📩 Email: ${emailTrim}\n` +
+    `🗓️ Fecha: ${new Date().toLocaleString()}`;
+
+  const url = `https://wa.me/${OWNER_WHATSAPP}?text=${encodeURIComponent(msg)}`;
+
+  // abre WhatsApp Web / App
+  window.open(url, "_blank", "noopener,noreferrer");
+
+  // tu UI de "suscrito"
+  setSubscribed(true);
+  setTimeout(() => {
+    setSubscribed(false);
+    setEmail("");
+  }, 3000);
+};
 
   return (
     <footer className="bg-gradient-to-b from-white to-background py-12 border-t border-border">
@@ -83,7 +100,7 @@ export function Footer({ onOpenAdmin }: FooterProps) {
         </div>
 
         <div className="border-t border-border pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-muted-foreground text-center sm:text-left">&copy; 2024 by Eternal Rose. Todos los derechos reservados.</p>
+          <p className="text-muted-foreground text-center sm:text-left">&copy; 2026 by Eternal Rose. Todos los derechos reservados.</p>
         </div>
       </div>
     </footer>

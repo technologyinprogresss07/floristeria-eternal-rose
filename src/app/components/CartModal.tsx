@@ -1,4 +1,5 @@
 import { X, ShoppingBag, Trash2 } from 'lucide-react';
+import { supabase } from "../../lib/supabaseClient";
 
 interface CartItem {
   id: string;
@@ -23,6 +24,74 @@ export function CartModal({ isOpen, onClose, items, onRemoveItem, onUpdateQuanti
     const price = item.price;
     return sum + (price * item.quantity);
   }, 0);
+
+const OWNER_WHATSAPP = "18299105423"; 
+
+const handleCheckout = async () => {
+  if (items.length === 0) return;
+
+  // 1) Crear pedido en Supabase
+  const { data: order, error: orderError } = await supabase
+    .from("orders")
+    .insert([
+      {
+        total: total,
+        customer_name: null,
+        customer_phone: null,
+      },
+    ])
+    .select("id, created_at")
+    .single();
+
+  if (orderError) {
+    console.error(orderError);
+    alert("No se pudo crear el pedido.");
+    return;
+  }
+
+  // 2) Crear items del pedido en Supabase
+  const rows = items.map((i) => ({
+    order_id: order.id,
+    product_id: i.id,
+    product_name: i.name,
+    price: i.price,
+    quantity: i.quantity,
+    image_url: i.image_url,
+  }));
+
+  const { error: itemsError } = await supabase.from("order_items").insert(rows);
+
+  if (itemsError) {
+    console.error(itemsError);
+    alert("Pedido creado, pero no se guardaron los productos.");
+    return;
+  }
+
+  // 3) Mensaje WhatsApp (formal, sin emojis)
+  const date = new Date(order.created_at).toLocaleString();
+
+  const lines = items.map((i) => {
+    const subtotal = i.price * i.quantity;
+    return `- ${i.name} x${i.quantity} — RD$${subtotal.toLocaleString()}`;
+  });
+
+  const msg =
+`PEDIDO NUEVO
+ID: ${order.id.slice(0, 8).toUpperCase()}
+Fecha: ${date}
+
+DETALLE:
+${lines.join("\n")}
+
+TOTAL: RD$${total.toFixed(2)}
+
+Enviado desde la web`;
+
+  const url = `https://wa.me/${OWNER_WHATSAPP}?text=${encodeURIComponent(msg)}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+
+  alert("Pedido enviado. ¡Gracias!");
+};
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -82,9 +151,12 @@ export function CartModal({ isOpen, onClose, items, onRemoveItem, onUpdateQuanti
               <span>Total:</span>
               <span className="text-primary">RD${total.toFixed(2)}</span>
             </div>
-            <button className="w-full bg-primary text-primary-foreground px-8 py-3 rounded-full hover:opacity-90 transition-opacity">
-              Finalizar Compra
-            </button>
+            <button
+            onClick={handleCheckout}
+            className="w-full bg-primary text-primary-foreground px-8 py-3 rounded-full hover:opacity-90 transition-opacity"
+          >
+            Finalizar Compra
+          </button>
           </div>
         )}
       </div>
